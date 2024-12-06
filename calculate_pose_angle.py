@@ -40,6 +40,53 @@ def calculate_trunk_bending_angle(pelvis, neck):
     return calculate_angle(trunk_vector, np.array([0, 1, 0]))
 
 
+def calculate_upper_arm_posture_angle(shoulder, wrist, hip):
+    """
+    Calculate the angle between the arm and the trunk
+    """
+
+    arm_vector = wrist - shoulder
+    trunk_vector = shoulder - hip
+    return calculate_angle(arm_vector, trunk_vector)
+
+
+def calculate_upper_arm_posture_angle_2(shoulder, wrist):
+    arm_vector = wrist - shoulder
+    horizontal_vector = np.array([1, 0, 0])
+    return calculate_angle(arm_vector, horizontal_vector)
+
+
+def calculate_trunk_twsting_angle(hip_left, hip_right, shoulder_left, shoulder_right):
+    """
+    Calculate the angle between the trunk and the vertical axis
+    we want to calculate the twisting angle of the trunk
+    """
+    trunk_vector = shoulder_right - shoulder_left
+    hip_vector = hip_right - hip_left
+
+    # remove the y component
+    trunk_vector[1] = 0
+    hip_vector[1] = 0
+
+
+def calculate_lumbar_spine_posture_angle(pelvis, thorax, neck):
+    
+    pelvis_vector = pelvis - thorax
+    thorax_vector = neck - thorax
+
+    return calculate_angle(pelvis_vector, thorax_vector)
+
+
+def calculate_trunk_bending_sideways(hip, neck):
+    """
+    Calculate the angle between the trunk and the vertical axis
+    we want to calculate the bending angle of the trunk
+    """
+    trunk_vector = neck - hip
+
+    return calculate_angle(trunk_vector, np.array([0, 1, 0]))
+
+
 def calculate_pose(poses: np.ndarray):
     """
     # TODO describe the function
