@@ -4,6 +4,92 @@ import json
 
 import numpy as np
 
+####### utils #######
+
+def rotate_axis_using_right_shoulder(points, new_origin, direction_point):
+    """
+    Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
+
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        new_origin (numpy.ndarray): Coordinates of new_origin , shape (3,).
+        direction_point (numpy.ndarray): Coordinates of direction_point to define the x-axis, shape (3,).
+
+    Returns:
+        numpy.ndarray: Transformed points with the new origin and rotated axes.
+    """
+    new_origin = points[14]  # right shoulder
+    direction_point = points[11]  # left shoulder
+
+    # Direction vector for the new x-axis
+    x_axis_direction = direction_point - new_origin
+    x_axis_direction = x_axis_direction / np.linalg.norm(x_axis_direction)  # Normalize
+
+    # Choose an arbitrary vector for computing the orthogonal z-axis
+    arbitrary_vector = np.array([0, 1, 0])
+
+    z_axis = np.cross(x_axis_direction, arbitrary_vector)
+    z_axis /= np.linalg.norm(z_axis)
+
+    y_axis = np.cross(z_axis, x_axis_direction)
+    y_axis /= np.linalg.norm(y_axis)
+
+    # rotation matrix
+    rotation_matrix = np.stack([x_axis_direction, y_axis, z_axis], axis=1)
+
+    translated_points = points - new_origin
+    rotated_points = translated_points @ rotation_matrix
+
+    # rotate 180 degrees around the x-axis
+    rotated_points = rotated_points @ np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
+
+    return rotated_points
+
+
+def rotate_axis_using_left_shoulder(points, new_origin, direction_point):
+    """
+    Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
+
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        new_origin (numpy.ndarray): Coordinates of new_origin , shape (3,).
+        direction_point (numpy.ndarray): Coordinates of direction_point to define the x-axis, shape (3,).
+
+    Returns:
+        numpy.ndarray: Transformed points with the new origin and rotated axes.
+    """
+    new_origin = points[11]  # left shoulder
+    direction_point = points[14]  # right shoulder
+
+    # Direction vector for the new x-axis
+    x_axis_direction = direction_point - new_origin
+    x_axis_direction = -x_axis_direction / np.linalg.norm(
+        x_axis_direction
+    )  # negative direction
+
+    # Choose an arbitrary vector for computing the orthogonal z-axis
+    arbitrary_vector = np.array([0, 1, 0])
+
+    z_axis = np.cross(x_axis_direction, arbitrary_vector)
+    z_axis /= np.linalg.norm(z_axis)
+
+    y_axis = np.cross(z_axis, x_axis_direction)
+    y_axis /= np.linalg.norm(y_axis)
+
+    # rotation matrix
+    rotation_matrix = np.stack([x_axis_direction, y_axis, z_axis], axis=1)
+
+    translated_points = points - new_origin
+    rotated_points = translated_points @ rotation_matrix
+
+    # rotate 180 degrees around the x-axis
+    rotated_points = rotated_points @ np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])
+
+    return rotated_points
+
+
+
+
 
 def calculate_angle(vector_1, vector_2):
     dot_product = np.dot(vector_1, vector_2)
@@ -231,18 +317,6 @@ def calculate_pose(poses: np.ndarray):
                 for i in range(poses.shape[0])
             ]
         },
-        # {
-        #     "calculate_upper_arm_posture_angle_2_right": [
-        #         calculate_upper_arm_posture_angle_2(poses[i][14], poses[i][16])
-        #         for i in range(poses.shape[0])
-        #     ]
-        # },
-        # {
-        #     "calculate_upper_arm_posture_angle_2_left": [
-        #         calculate_upper_arm_posture_angle_2(poses[i][11], poses[i][13])
-        #         for i in range(poses.shape[0])
-        #     ]
-        # },
         {
             "calculate_trunk_twsting_angle": [
                 calculate_trunk_twsting_angle(
