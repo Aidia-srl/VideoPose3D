@@ -6,7 +6,7 @@ import numpy as np
 
 ####### utils #######
 
-def rotate_axis_using_right_shoulder(points, new_origin, direction_point):
+def rotate_axis_using_right_shoulder(points):
     """
     Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
 
@@ -33,11 +33,17 @@ def rotate_axis_using_right_shoulder(points, new_origin, direction_point):
 
     y_axis = np.cross(z_axis, x_axis_direction)
     y_axis /= np.linalg.norm(y_axis)
+    
+    
+    translated_points = points - new_origin
 
+    # y_axix should be directed on the same direction of the mouth and the nose
+    if np.sign(translated_points[9][1]) != np.sign(y_axis[1]):
+        y_axis = -y_axis 
+        
     # rotation matrix
     rotation_matrix = np.stack([x_axis_direction, y_axis, z_axis], axis=1)
 
-    translated_points = points - new_origin
     rotated_points = translated_points @ rotation_matrix
 
     # rotate 180 degrees around the x-axis
@@ -46,7 +52,7 @@ def rotate_axis_using_right_shoulder(points, new_origin, direction_point):
     return rotated_points
 
 
-def rotate_axis_using_left_shoulder(points, new_origin, direction_point):
+def rotate_axis_using_left_shoulder(points):
     """
     Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
 
@@ -76,10 +82,16 @@ def rotate_axis_using_left_shoulder(points, new_origin, direction_point):
     y_axis = np.cross(z_axis, x_axis_direction)
     y_axis /= np.linalg.norm(y_axis)
 
+
+    translated_points = points - new_origin
+
+    # y_axix should be directed on the same direction of the mouth and the nose
+    if np.sign(translated_points[9][1]) != np.sign(y_axis[1]):
+        y_axis = -y_axis 
+        
     # rotation matrix
     rotation_matrix = np.stack([x_axis_direction, y_axis, z_axis], axis=1)
 
-    translated_points = points - new_origin
     rotated_points = translated_points @ rotation_matrix
 
     # rotate 180 degrees around the x-axis
@@ -88,30 +100,48 @@ def rotate_axis_using_left_shoulder(points, new_origin, direction_point):
     return rotated_points
 
 
+def calculate_angle(vector_1: np.ndarray, vector_2: np.ndarray) -> int:
+    """
+    Calculate the angle between two vectors in degrees.
 
+    Parameters:
+        vector_1 (numpy.ndarray): First vector.
+        vector_2 (numpy.ndarray): Second vector.
 
-
-def calculate_angle(vector_1, vector_2):
+    Returns:
+        int: The angle between the two vectors in degrees.
+    """
     dot_product = np.dot(vector_1, vector_2)
     magnitude_vector_1 = np.linalg.norm(vector_1)
     magnitude_vector_2 = np.linalg.norm(vector_2)
 
-    return int(
-        np.degrees(np.arccos(dot_product / (magnitude_vector_1 * magnitude_vector_2)))
-    )
+    # Ensure the dot product is within the valid range for arccos
+    cos_angle = np.clip(dot_product / (magnitude_vector_1 * magnitude_vector_2), -1.0, 1.0)
+
+    return int(np.degrees(np.arccos(cos_angle)))
 
 
-def plane_from_points(p1, p2, p3):
-    p1, p2, p3 = np.array(p1), np.array(p2), np.array(p3)
+def plane_from_points(p1: np.ndarray, p2: np.ndarray, p3: np.ndarray) -> tuple:
+    """
+    Calculate the plane equation coefficients from three points.
 
+    Parameters:
+        p1 (numpy.ndarray): First point, shape (3,).
+        p2 (numpy.ndarray): Second point, shape (3,).
+        p3 (numpy.ndarray): Third point, shape (3,).
+
+    Returns:
+        tuple: Coefficients (a, b, c, d) of the plane equation ax + by + cz + d = 0.
+    """
     v1 = p2 - p1
     v2 = p3 - p1
 
     normal_vector = np.cross(v1, v2)
+    normal_vector /= np.linalg.norm(normal_vector)  # Normalize the normal vector
 
     a, b, c = normal_vector
-
     d = -np.dot(normal_vector, p1)
+
     return a, b, c, d
 
 
@@ -141,24 +171,53 @@ def project_point_to_plane(point, plane):
     return tuple(projection)
 
 
-def proj_plane(a, b, c, d, point):
+def project_point_to_plane_equation(a: float, b: float, c: float, d: float, point: np.ndarray) -> float:
+    """
+    Calculate the projection of a point onto a plane using the plane equation.
+
+    Parameters:
+        a (float): Coefficient of x in the plane equation.
+        b (float): Coefficient of y in the plane equation.
+        c (float): Coefficient of z in the plane equation.
+        d (float): Constant term in the plane equation.
+        point (numpy.ndarray): Coordinates of the point (x, y, z).
+
+    Returns:
+        float: The result of the plane equation for the given point.
+    """
     return a * point[0] + b * point[1] + c * point[2] + d
 
 
-def calculate_elbow_flexion_extention_angle(shoulder, elbow, wrist):
+######### angles #########
+
+def calculate_elbow_flexion_extension_angle(shoulder: np.ndarray, elbow: np.ndarray, wrist: np.ndarray) -> int:
+    """
+    Calculate the elbow flexion/extension angle.
+
+    Parameters:
+        shoulder (numpy.ndarray): Coordinates of the shoulder, shape (3,).
+        elbow (numpy.ndarray): Coordinates of the elbow, shape (3,).
+        wrist (numpy.ndarray): Coordinates of the wrist, shape (3,).
+
+    Returns:
+        int: The elbow flexion/extension angle in degrees.
+    """
     shoulder_elbow = elbow - shoulder
     elbow_wrist = wrist - elbow
 
     return calculate_angle(shoulder_elbow, elbow_wrist)
 
 
-def calculate_trunk_bending_angle(pelvis, neck):
+def calculate_trunk_bending_angle(pelvis: np.ndarray, neck: np.ndarray) -> int:
     """
-    trunk inclination angle
-    Calcualte the angle between the trunk and the vertical axis
-    we want to calculate the bending angle of the trunk
+    Calculate the trunk bending angle.
 
-    it works only when the person is standing
+    Parameters:
+        pelvis (numpy.ndarray): Coordinates of the pelvis, shape (3,).
+        neck (numpy.ndarray): Coordinates of the neck, shape (3,).
+
+    Returns:
+        int: The trunk bending angle in degrees.
     """
     trunk_vector = neck - pelvis
 
@@ -170,91 +229,177 @@ def calculate_upper_arm_posture_angle(shoulder, elbow, hip):
     Calculate the angle between the arm and the trunk
     """
 
+    # TODO da rifare
     arm_vector = elbow - shoulder
     trunk_vector = hip - shoulder
     return calculate_angle(arm_vector, trunk_vector)
 
 
-def calculate_upper_arm_posture_angle_2(shoulder, wrist):
-    # TODO check if is the same as calculate_upper_arm_posture_angle
-    arm_vector = wrist - shoulder
-    horizontal_vector = np.array([1, 0, 0])
-    return calculate_angle(arm_vector, horizontal_vector)
 
-
-def calculate_trunk_twsting_angle(hip_left, hip_right, shoulder_left, shoulder_right):
+def calculate_trunk_twisting_angle(hip_left: np.ndarray, hip_right: np.ndarray, shoulder_left: np.ndarray, shoulder_right: np.ndarray) -> int:
     """
-    Calculate the angle between the trunk and the vertical axis
-    we want to calculate the twisting angle of the trunk
+    Calculate the trunk twisting angle.
+
+    Parameters:
+        hip_left (numpy.ndarray): Coordinates of the left hip, shape (3,).
+        hip_right (numpy.ndarray): Coordinates of the right hip, shape (3,).
+        shoulder_left (numpy.ndarray): Coordinates of the left shoulder, shape (3,).
+        shoulder_right (numpy.ndarray): Coordinates of the right shoulder, shape (3,).
+
+    Returns:
+        int: The trunk twisting angle in degrees.
     """
     trunk_vector = shoulder_right - shoulder_left
     hip_vector = hip_right - hip_left
 
-    # remove the y component
-    trunk_vector[2] = 0
-    hip_vector[2] = 0
+    # Remove the y component
+    trunk_vector[1] = 0
+    hip_vector[1] = 0
 
     return calculate_angle(trunk_vector, hip_vector)
 
 
-def calculate_lumbar_spine_posture_angle(pelvis, thorax, neck):
-    # For Sitting: Convex Lumbar Spine Posture
+def calculate_lumbar_spine_posture_angle(pelvis: np.ndarray, thorax: np.ndarray, neck: np.ndarray) -> int:
+    """
+    Calculate the lumbar spine posture angle.
 
+    Parameters:
+        pelvis (numpy.ndarray): Coordinates of the pelvis, shape (3,).
+        thorax (numpy.ndarray): Coordinates of the thorax, shape (3,).
+        neck (numpy.ndarray): Coordinates of the neck, shape (3,).
+
+    Returns:
+        int: The lumbar spine posture angle in degrees.
+    """
     pelvis_vector = pelvis - thorax
     thorax_vector = neck - thorax
 
     return calculate_angle(pelvis_vector, thorax_vector)
 
 
-def calculate_trunk_bending_sideways(pelvis, neck):
+def calculate_trunk_bending_sideways(pelvis: np.ndarray, neck: np.ndarray) -> int:
     """
-    Calculate the angle between the trunk and the vertical axis
-    we want to calculate the bending angle of the trunk
+    Calculate the sideways bending angle of the trunk.
+
+    Parameters:
+        pelvis (numpy.ndarray): Coordinates of the pelvis, shape (3,).
+        neck (numpy.ndarray): Coordinates of the neck, shape (3,).
+
+    Returns:
+        int: The sideways bending angle of the trunk in degrees.
     """
     trunk_vector = neck - pelvis
 
     return calculate_angle(trunk_vector, np.array([0, 1, 0]))
 
 
-def calculate_knee_flextion_angle(hip, knee, ankle):
+def calculate_knee_flexion_angle(hip: np.ndarray, knee: np.ndarray, ankle: np.ndarray) -> int:
     """
-    if the flextion is under 40 degrees, it is considered as extreme flextion07
-    """
+    Calculate the knee flexion angle.
 
+    Parameters:
+        hip (numpy.ndarray): Coordinates of the hip, shape (3,).
+        knee (numpy.ndarray): Coordinates of the knee, shape (3,).
+        ankle (numpy.ndarray): Coordinates of the ankle, shape (3,).
+
+    Returns:
+        int: The knee flexion angle in degrees.
+    """
     hip_knee = hip - knee
     knee_ankle = ankle - knee
 
     return calculate_angle(hip_knee, knee_ankle)
 
 
-def calculate_upper_arm_retroflexion(
-    shoulder_left, shoulder_right, pelvis, elbow, mouth
-):
-    # calculate the plan that is formed by the shoulders and the pelvis
-    plane = plane_from_points(shoulder_left, shoulder_right, pelvis)
+def calculate_upper_arm_retroflexion(points: np.ndarray, side: str) -> bool:
+    """
+    Determine if the upper arm is in retroflexion based on the position of the elbow relative to the trunk.
 
-    elbow_sign = np.sign(proj_plane(*plane, elbow))
-    mouth_sign = np.sign(proj_plane(*plane, mouth))
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        side (str): 'left' or 'right' indicating which arm to check.
 
-    # if the elbow and the mouth are on the same side of the plane, the sign is positive
-    return elbow_sign * mouth_sign
+    Returns:
+        bool: True if the upper arm is in retroflexion, False otherwise.
+    """
+    if side == "left":
+        new_points = rotate_axis_using_left_shoulder(points)
+        elbow_y = new_points[12][1]
+    else:
+        new_points = rotate_axis_using_right_shoulder(points)
+        elbow_y = new_points[15][1]
+        
+    # If the y-axis value is negative, the elbow is behind the trunk
+    return elbow_y < 0
+    
+def calculate_arm_abduction(points: np.ndarray, side: str) -> bool:
+    """
+    Determine if the arm is abducted based on the position of the elbow relative to the trunk.
 
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        side (str): 'left' or 'right' indicating which arm to check.
 
-def calculate_arm_abduction_angle(shoulder, elbow, wrist):
-    # creare piano spallae pelvico, calcolare proiezione, la distanza punto tra polso spalla
-    pass
+    Returns:
+        bool: True if the arm is abducted, False otherwise.
+    """
+    if side == "left":
+        new_points = rotate_axis_using_left_shoulder(points)
+        elbow = new_points[12][:2]
+        return np.sign(elbow[0]) > 0 and np.sign(elbow[1]) > 0
+    else:
+        new_points = rotate_axis_using_right_shoulder(points)
+        elbow = new_points[15][:2]
+        return np.sign(elbow[0]) < 0 and np.sign(elbow[1]) > 0
+    
+def calculate_external_rotation(points: np.ndarray, side: str) -> int:
+    """
+    Calculate the external rotation angle of the arm.
 
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        side (str): 'left' or 'right' indicating which arm to check.
 
-def calculate_external_rotation(shoulder, elbow, wrist):
-    # angolo del gomito deve essere 90
-    # il polso deve avere segno opposto della proiezione rispetto al naso
-    pass
+    Returns:
+        int: The external rotation angle in degrees, or -1 if no external rotation.
+    """
+    if side == "left":
+        new_points = rotate_axis_using_left_shoulder(points)
+        elbow = new_points[12][:2]
+        if np.sign(elbow[0]) > 0:
+            return -1  # no external rotation
+    else:
+        new_points = rotate_axis_using_right_shoulder(points)
+        elbow = new_points[15][:2]
+        if np.sign(elbow[0]) < 0:
+            return -1  # no external rotation
 
+    return calculate_angle(elbow, np.array([0, 1]))  # calculate the angle between the elbow and the y-axis
+    
 
-def calculate_lateral_flexion_torso(shoulder, hip, ankle):
-    # spalle devono essere parallel al bacino
-    pass
+def calculate_lateral_flexion_torso(points: np.ndarray) -> bool:
+    """
+    Determine if there is lateral flexion of the torso based on the angle between the shoulders and the neck.
 
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+
+    Returns:
+        bool: True if there is lateral flexion, False otherwise.
+    """
+    
+    THRESHOLD = 0.1 #10%
+    shoulder_left_angle = calculate_angle(points[11], points[8])
+    shoulder_right_angle = calculate_angle(points[14], points[8])
+
+    magnitude_left = np.linalg.norm(points[11])
+    magnitude_right = np.linalg.norm(points[14])
+
+    angle_difference = np.abs(shoulder_left_angle - shoulder_right_angle)
+    magnitude_difference = np.abs(magnitude_left - magnitude_right)
+
+    return angle_difference > max(shoulder_left_angle, shoulder_right_angle) * THRESHOLD and magnitude_difference > 0
+    
 
 def calculate_axial_rotation_torso(shoulder, hip, ankle):
     # spalle e bacino devono incidere su piu punti, se incide su un punto solo è flessione laterale
@@ -281,7 +426,7 @@ def calculate_pose(poses: np.ndarray):
     pose = [
         {
             "elbow_flexion_extention_left": [
-                calculate_elbow_flexion_extention_angle(
+                calculate_elbow_flexion_extension_angle(
                     poses[i][11], poses[i][12], poses[i][13]
                 )
                 for i in range(poses.shape[0])
@@ -289,7 +434,7 @@ def calculate_pose(poses: np.ndarray):
         },
         {
             "elbow_flexion_extention_right": [
-                calculate_elbow_flexion_extention_angle(
+                calculate_elbow_flexion_extension_angle(
                     poses[i][14], poses[i][15], poses[i][16]
                 )
                 for i in range(poses.shape[0])
