@@ -6,7 +6,7 @@ import numpy as np
 
 ####### utils #######
 
-def rotate_axis_using_right_shoulder(points):
+def rotate_axis_using_right_shoulder(points, new_origin, direction_point):
     """
     Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
 
@@ -99,6 +99,46 @@ def rotate_axis_using_left_shoulder(points):
 
     return rotated_points
 
+def rotate_axis_x(points, new_origin, direction_point):
+    """
+    Rotate a 3D axis system with the origin set to new_origin and align the x-axis using the shoulder direction.
+    
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        new_origin (numpy.ndarray): Coordinates of new_origin , shape (3,).
+        direction_point (numpy.ndarray): Coordinates of direction_point to define the x-axis, shape (3,).
+    
+    Returns:
+        numpy.ndarray: Transformed points with the new origin and rotated axes.
+    """
+    
+    # Compute the direction vector for the new x-axis
+    x_axis_direction = direction_point - new_origin
+    x_axis_direction = x_axis_direction / np.linalg.norm(x_axis_direction)  # Normalize
+    
+    # Choose an arbitrary vector for computing the orthogonal z-axis
+    arbitrary_vector = np.array([0, 1, 0]) 
+    
+    # Compute the new z-axis (orthogonal to x-axis and arbitrary vector)
+    z_axis = np.cross(x_axis_direction, arbitrary_vector)
+    z_axis /= np.linalg.norm(z_axis)
+    
+    # Compute the new y-axis (orthogonal to both x-axis and z-axis)
+    y_axis = np.cross(z_axis, x_axis_direction)
+    y_axis /= np.linalg.norm(y_axis)
+    
+    # Build the rotation matrix (columns are the new basis vectors)
+    rotation_matrix = np.stack([x_axis_direction, y_axis, z_axis], axis=1)
+    
+    # Translate points to the new origin
+    translated_points = points - new_origin
+    
+    # Rotate points to align the axes
+    rotated_points = translated_points @ rotation_matrix
+    
+    rotated_points =  rotated_points @ np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]]) 
+    
+    return rotated_points
 
 def calculate_angle(vector_1: np.ndarray, vector_2: np.ndarray) -> int:
     """
@@ -224,17 +264,32 @@ def calculate_trunk_bending_angle(pelvis: np.ndarray, neck: np.ndarray) -> int:
     return calculate_angle(trunk_vector, np.array([0, 0, 1]))
 
 
-def calculate_upper_arm_posture_angle(shoulder, elbow, hip):
+def calculate_upper_arm_posture_angle(points: np.ndarray, side: str) -> int:
     """
-    Calculate the angle between the arm and the trunk
+    Calculate the angle between the arm and the trunk.
+
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        side (str): 'left' or 'right' indicating which arm to check.
+
+    Returns:
+        int: The angle between the arm and the trunk in degrees, or -1 if the arm is in an invalid position.
     """
+    if side == "left":
+        new_points = rotate_axis_using_left_shoulder(points)
+        angle = calculate_angle(new_points[12], new_points[4])
+        elbow = new_points[12]
+        invalid_position = np.sign(elbow[0]) > 0 and np.sign(elbow[1]) > 0
+    else:
+        new_points = rotate_axis_using_right_shoulder(points)
+        angle = calculate_angle(new_points[15], new_points[1])
+        elbow = new_points[15]
+        invalid_position = np.sign(elbow[0]) < 0 and np.sign(elbow[1]) < 0
 
-    # TODO da rifare
-    arm_vector = elbow - shoulder
-    trunk_vector = hip - shoulder
-    return calculate_angle(arm_vector, trunk_vector)
-
-
+    if invalid_position or np.sign(elbow[1]) < 0:
+        return -1
+    return angle
+    
 
 def calculate_trunk_twisting_angle(hip_left: np.ndarray, hip_right: np.ndarray, shoulder_left: np.ndarray, shoulder_right: np.ndarray) -> int:
     """
@@ -401,10 +456,22 @@ def calculate_lateral_flexion_torso(points: np.ndarray) -> bool:
     return angle_difference > max(shoulder_left_angle, shoulder_right_angle) * THRESHOLD and magnitude_difference > 0
     
 
-def calculate_axial_rotation_torso(shoulder, hip, ankle):
-    # spalle e bacino devono incidere su piu punti, se incide su un punto solo è flessione laterale
-    pass
+def calculate_axial_rotation_torso(points: np.ndarray, direction: np.ndarray) -> bool:
+    """
+    Determine if there is axial rotation of the torso based on the direction.
 
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+        direction (numpy.ndarray): Direction vector to align the x-axis, shape (3,).
+
+    Returns:
+        bool: True if there is axial rotation, False otherwise.
+    """
+    new_points = rotate_axis_x(points, points[0], direction)
+    return not (
+        np.sign(new_points[11][0]) != np.sign(new_points[14][0])
+        and np.sign(new_points[11][1]) == np.sign(new_points[14][1])
+    )
 
 def calculate_pose(poses: np.ndarray):
     """
@@ -464,7 +531,7 @@ def calculate_pose(poses: np.ndarray):
         },
         {
             "calculate_trunk_twsting_angle": [
-                calculate_trunk_twsting_angle(
+                calculate_trunk_twisting_angle(
                     poses[i][4], poses[i][1], poses[i][11], poses[i][14]
                 )
                 for i in range(poses.shape[0])
