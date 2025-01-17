@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 
 import numpy as np
 
@@ -479,7 +480,18 @@ def calculate_lateral_flexion_torso(points: np.ndarray) -> int:
         and magnitude_difference > 0
     )
 
+def calculate_sideway_angle(points: np.ndarray) -> int:
+    """
+    Calculate the sideways angle of the trunk.
 
+    Parameters:
+        points (numpy.ndarray): Array of shape (N, 3) with 3D points [x, y, z].
+
+    Returns:
+        int: The sideways angle of the trunk in degrees.
+    """
+    angle = calculate_angle(points[8], np.array([0, 0, 1]))
+    return int(angle)
 def calculate_axial_rotation_torso(points: np.ndarray, direction: np.ndarray) -> int:
     """
     Determine if there is axial rotation of the torso based on the direction.
@@ -492,12 +504,22 @@ def calculate_axial_rotation_torso(points: np.ndarray, direction: np.ndarray) ->
         int: True if there is axial rotation, False otherwise.
     """
     new_points = rotate_axis_x(points, points[0], direction)
-    return int(
-        not (
-            np.sign(new_points[11][0]) != np.sign(new_points[14][0])
-            and np.sign(new_points[11][1]) == np.sign(new_points[14][1])
-        )
-    )
+    vect = new_points[14][:2]
+    # calucalte the angle of the vector
+    
+    angle_radians = math.atan2(vect[1], vect[0])
+    # Convert to degrees if needed
+    angle_degrees = math.degrees(angle_radians)
+    if angle_degrees < 0:
+        angle_degrees = abs(angle_degrees)
+    return 180-int(angle_degrees)
+
+    # return int(
+    #     not (
+    #         np.sign(new_points[11][0]) != np.sign(new_points[14][0])
+    #         and np.sign(new_points[11][1]) == np.sign(new_points[14][1])
+    #     )
+    # )
 
 
 def calculate_pose(poses: np.ndarray):
@@ -559,10 +581,17 @@ def calculate_pose(poses: np.ndarray):
         },
         "calculate_axial_rotation_torso": {
             "value": [
-                calculate_axial_rotation_torso(poses[i], poses[i][0])
+                calculate_axial_rotation_torso(poses[i], poses[i][1])
                 for i in range(poses.shape[0])
             ],
-            "bool": 1,
+            "bool": 0,
+        },
+        "calculate_sideway_angle": {
+            "value": [
+                calculate_sideway_angle(poses[i])
+                for i in range(poses.shape[0])
+            ],
+            "bool": 0,
         },
         "calculate_lumbar_spine_posture_angle": {
             "value": [
